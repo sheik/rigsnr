@@ -7,6 +7,8 @@
 #include <thread>
 #include <mutex>
 #include <conio.h>
+#include <vector>
+#include <algorithm>
 
 #include "hamlib/rig.h"
 
@@ -19,6 +21,30 @@ double snr = 0, dnr = 0;
 double h = 1, l = 200;
 
 bool still_alive = true;
+
+// fuction pointer for the rig_list_foreach function
+std::vector<std::pair<int, std::string>> models_vector;
+int hash_model_list(const rig_caps* rig, void* data) {
+    char buf[256];
+    snprintf(buf, 256, "%6d   %-23s%-24s", rig->rig_model, rig->mfg_name, rig->model_name);
+    models_vector.push_back(std::pair<int, std::string>(int(rig->rig_model), std::string(buf)));
+    return 1;
+}
+
+// comparitor function for sorting models
+bool cmp(std::pair<int, std::string> a, std::pair<int, std::string> b) {
+    return a.first < b.first;
+}
+
+// print all models available in hamlib
+void print_all_models() {
+    rig_load_all_backends();
+    rig_list_foreach(hash_model_list, NULL);
+    std::sort(models_vector.begin(), models_vector.end(), cmp);
+    for (auto& it : models_vector) {
+        std::cout << it.second << std::endl;
+    }
+}
 
 // Main input loop
 void input_handler() {
@@ -44,15 +70,33 @@ void input_handler() {
     }
 }
 
-int main()
+void print_help() {
+    std::cout << "rigsnr help               " << std::endl;
+    std::cout << "-l         list all models" << std::endl;
+}
+
+int main(int argc, char *argv[])
 {
     int retcode, strength;
+    
+    // disable debug messaging
+    rig_set_debug(RIG_DEBUG_NONE);
+
+    // parse arguments
+    for (int i = 0; i < argc; ++i) {
+        std::string flag(argv[i]);
+        if (flag == "-l") {
+            print_all_models();
+            return 0;
+        }
+        else if (flag == "-h") {
+            print_help();
+            return 0;
+        }
+    }
 
     // start keyboard capture thread
     std::thread t(input_handler);
-
-    // disable debug messaging
-    rig_set_debug(RIG_DEBUG_NONE);
 
     auto my_rig = rig_init(MODEL);
     if (!my_rig)
@@ -111,3 +155,4 @@ int main()
     t.join();
     return 0;
 }
+
