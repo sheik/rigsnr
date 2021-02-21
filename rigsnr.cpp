@@ -10,7 +10,6 @@
 
 constexpr auto SERIAL_PORT = "COM3";
 constexpr auto BAUD_RATE = 4800;
-constexpr auto ALPHA = 0.1;
 constexpr auto MODEL = RIG_MODEL_IC7300;
 
 int main()
