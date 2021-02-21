@@ -71,11 +71,13 @@ void input_handler() {
 }
 
 void print_help() {
+    std::cout << std::endl;
     std::cout << "rigsnr help                                                        " << std::endl;
     std::cout << "-m, --model=ID           Radio model (see -l for radio model IDS)  " << std::endl;
     std::cout << "-l, --list               List all models                           " << std::endl;
     std::cout << "-r, --rig-file=DEVICE    Set device of the radio to operate on     " << std::endl;
     std::cout << "-s, --serial-speed       Set the BAUD rate of the serial connection" << std::endl;
+    std::cout << "-v, --verbose            Set verbose on (shows debug info)         " << std::endl;
     std::cout << std::endl;
 }
 
@@ -110,6 +112,9 @@ int main(int argc, char *argv[])
         }
         else if (flag == "-r" || flag == "--rig-file") {
             SERIAL_PORT = std::string(argv[++i]);
+        }
+        else if (flag == "-v" || flag == "--verbose") {
+            rig_set_debug(RIG_DEBUG_VERBOSE);
         }
     }
 
@@ -173,4 +178,3 @@ int main(int argc, char *argv[])
     t.join();
     return 0;
 }
-
