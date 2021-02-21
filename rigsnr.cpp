@@ -5,6 +5,8 @@
 #include <iostream>
 #include <math.h>
 #include <thread>
+#include <mutex>
+#include <conio.h>
 
 #include "hamlib/rig.h"
 
@@ -12,18 +14,47 @@ constexpr auto SERIAL_PORT = "COM3";
 constexpr auto BAUD_RATE = 4800;
 constexpr auto MODEL = RIG_MODEL_IC7300;
 
+std::mutex snr_lock;
+double snr = 0, dnr = 0;
+double h = 1, l = 200;
+
+bool still_alive = true;
+
+// Main input loop
+void input_handler() {
+    int key;
+    while (still_alive) {
+        key = _getch();
+        snr_lock.lock();
+        h = 1, l = 200;
+
+        // User pressed enter, save input
+        if (key == 13) {
+            std::cout << std::endl;
+        }
+
+        // User pressed ctrl+C, Exit
+        if (key == 3) {
+            // we must die now
+            std::cout << std::endl;
+            still_alive = false;
+        }
+        snr_lock.unlock();
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+}
+
 int main()
 {
-    RIG* my_rig;
-    hamlib_port_t myport;
-    rig_model_t myrig_model;
     int retcode, strength;
-    double snr, dnr, h = 1, l = 100;
+
+    // start keyboard capture thread
+    std::thread t(input_handler);
 
     // disable debug messaging
     rig_set_debug(RIG_DEBUG_NONE);
 
-    my_rig = rig_init(MODEL);
+    auto my_rig = rig_init(MODEL);
     if (!my_rig)
     {
         fprintf(stderr, "Unable to init rig (wrong rig selection?)\n");
@@ -41,7 +72,7 @@ int main()
         exit(2);
     }
 
-    while (1) {
+    while (still_alive) {
         // get a reading from the S-meter
         // if it fails, just wait 20ms and continue
         retcode = rig_get_strength(my_rig, RIG_VFO_CURR, &strength);
@@ -57,6 +88,7 @@ int main()
         // (hamlib normalizes s9 to 0)
         strength = strength + 55;
 
+        snr_lock.lock();
         // set our high and low value
         h = strength > h ? strength : h;
         l = strength < l ? strength : l;
@@ -64,9 +96,18 @@ int main()
         // do our calculations
         snr = 10.0 * log(abs(h/l));
         dnr = h - l;
+        snr_lock.unlock();
 
-        // output
-        std::cout << "SNR: " << snr << "dB" << std::endl;
-        std::cout << "DNR: " << dnr << "dB" << std::endl;
+        // output and delete
+        char output[256];
+        snprintf(output, 256, "SNR: %10f DNR: %f", snr, dnr);
+        std::string o(output);
+        std::cout << o << std::string(o.length(), '\b');
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
+
+    // join thread
+    t.join();
+    return 0;
 }
