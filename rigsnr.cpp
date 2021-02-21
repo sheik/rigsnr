@@ -12,9 +12,9 @@
 
 #include "hamlib/rig.h"
 
-constexpr auto SERIAL_PORT = "COM3";
-constexpr auto BAUD_RATE = 4800;
-constexpr auto MODEL = RIG_MODEL_IC7300;
+std::string SERIAL_PORT = "COM3";
+auto BAUD_RATE = 4800;
+auto MODEL = RIG_MODEL_IC7300;
 
 std::mutex snr_lock;
 double snr = 0, dnr = 0;
@@ -71,8 +71,12 @@ void input_handler() {
 }
 
 void print_help() {
-    std::cout << "rigsnr help               " << std::endl;
-    std::cout << "-l         list all models" << std::endl;
+    std::cout << "rigsnr help                                                        " << std::endl;
+    std::cout << "-m, --model=ID           Radio model (see -l for radio model IDS)  " << std::endl;
+    std::cout << "-l, --list               List all models                           " << std::endl;
+    std::cout << "-r, --rig-file=DEVICE    Set device of the radio to operate on     " << std::endl;
+    std::cout << "-s, --serial-speed       Set the BAUD rate of the serial connection" << std::endl;
+    std::cout << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -81,6 +85,11 @@ int main(int argc, char *argv[])
     
     // disable debug messaging
     rig_set_debug(RIG_DEBUG_NONE);
+
+    if (argc < 2) {
+        print_help();
+        return 0;
+    }
 
     // parse arguments
     for (int i = 0; i < argc; ++i) {
@@ -93,6 +102,15 @@ int main(int argc, char *argv[])
             print_help();
             return 0;
         }
+        else if (flag == "-s" || flag == "--serial-speed") {
+            BAUD_RATE = atoi(argv[++i]);
+        }
+        else if (flag == "-m" || flag == "--model") {
+            MODEL = atoi(argv[++i]);
+        }
+        else if (flag == "-r" || flag == "--rig-file") {
+            SERIAL_PORT = std::string(argv[++i]);
+        }
     }
 
     // start keyboard capture thread
@@ -101,18 +119,18 @@ int main(int argc, char *argv[])
     auto my_rig = rig_init(MODEL);
     if (!my_rig)
     {
-        fprintf(stderr, "Unable to init rig (wrong rig selection?)\n");
+        fprintf(stderr, "rig_init: could not init rig (wrong rig selection?)\n");
         exit(1);
     }
 
     my_rig->state.rigport.type.rig = RIG_PORT_SERIAL;
     my_rig->state.rigport.parm.serial.rate = BAUD_RATE;
 
-    strncpy_s(my_rig->state.rigport.pathname, SERIAL_PORT, FILPATHLEN - 1);
+    strncpy_s(my_rig->state.rigport.pathname, SERIAL_PORT.c_str(), FILPATHLEN - 1);
     retcode = rig_open(my_rig);
     if (retcode != RIG_OK)
     {
-        printf("rig_open: error = %s\n", rigerror(retcode));
+        std::cout << "rig_open: could not open rig (" << retcode << ")" << std::endl;
         exit(2);
     }
 
